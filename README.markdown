@@ -1,5 +1,6 @@
 # Mongo consistent backup over RAID EBS disks on EC2 instance
 
+Suite of tools to backup and manage snapshots of MongoDB data set to EC2 Snapshots.
 
 ## Consistent Backup: ec2-consistent-backup.rb
 
@@ -25,8 +26,10 @@ to snapshot the data is running.
 
 ### Usage
 
+Snapshot a list of devices on a given instance on ec2. Requires network access in order to lock and unlock Mongo
+
 ```shell
-./lock_and_snapshot.rb -a DEZFEZRG -s de234F44 --hostname server01--devices /dev/sdl,/dev/slm
+./lock_and_snapshot.rb -a DEZFEZRG -s de234F44 --hostname server01 --devices /dev/sdl,/dev/slm
 ```
 
 ### Tool Description
