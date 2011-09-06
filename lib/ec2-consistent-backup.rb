@@ -1,7 +1,7 @@
-#!/usr/bin/env ruby
 require 'rubygems'
 require 'mongo'
 require 'aws'
+require 'open-uri'
 
 =begin
 - check S3 credentials
@@ -43,7 +43,7 @@ class MDInspector
         if md_info =~ /^md([0-9]+) : active ([^ ]+) (.*)$/
           set_name = "md#{$1}"
           personality = $2
-          drives = $3.split(/ /).map{ |i| i.gsub(/\[[0-9]+\]/,'') }.to_a
+          drives = $3.split(/ /).map{ |i| "/dev/"+i.gsub(/\[[0-9]+\]/,'') }.to_a
           @set_metadata[set_name] =  { :set_name=> set_name, :personality => personality, 
             :drives => drives}
         end
@@ -93,8 +93,8 @@ end
 module MongoHelper
   class DataLocker
     attr_reader :path
-    def initialize(port = 27017)
-      @m = Mongo::Connection.new('localhost', port)
+    def initialize(port = 27017, host = 'localhost')
+      @m = Mongo::Connection.new(host, port)
       args =  @m['admin'].command({'getCmdLineOpts' => 1 })['argv']
       p = args.index('--dbpath')
       @path = args[p+1]
@@ -124,14 +124,21 @@ module MongoHelper
 end
 
 class EC2DeviceHasNoVolume < Exception; end
+
+# This class is responsible of the snapshoting of given disks to EC2
 class EC2VolumeSnapshoter
   NAME_PREFIX='ECB:'
-  def initialize(aki, sak)
+  attr_reader :instance_id
+  # Need access_key_id, secret_access_key and instance_id
+  # If not provided, attempt to fetch current instance_id
+  def initialize(aki, sak, instance_id = open("http://169.254.169.254/latest/meta-data/instance-id").read)
+
+    @instance_id = instance_id
 
     @ec2 = AWS::EC2.new('access_key_id' => aki, 
       'secret_access_key' => sak)
   end
-  def snapshot_devices(devices, name ="#{NAME_PREFIX} Snapshot at #{Time.now}")
+  def snapshot_devices(devices, name ="#{NAME_PREFIX}:#{instance_id}")
 
     volumes = {}
     devices.each do |device|
@@ -139,15 +146,13 @@ class EC2VolumeSnapshoter
     end
     volumes.each do |device, volume|
       log "Creating snapshot for #{device} on instance #{instance_id}"
-      snapshot = volume.create_snapshot(name+" for #{device}")
+      snapshot = volume.create_snapshot(name+" #{device}")
       log "Snapshot: #{snapshot.id} started"
     end
   end
 
-
   def find_volume_for_device(device)
 
-    instance_id = `curl http://169.254.169.254/latest/meta-data/instance-id`
     @ec2.volumes.each do |volume|
       volume.attachments.each do |attachment|
         if attachment.device == device && attachment.instance.id == instance_id
@@ -157,10 +162,27 @@ class EC2VolumeSnapshoter
     end
     raise EC2DeviceHasNoVolume.new(device)
   end
-
 end
 
-# Logger to stderr
+class InstanceNotFoundException < Exception; end
+require 'resolv'
+# Fetch an instance from its private ip address
+class EC2InstanceIdentifier
+  # Need access_key_id, secret_access_key
+  def initialize(aki, sak)
+    @ec2 = AWS::EC2.new('access_key_id' => aki, 
+      'secret_access_key' => sak)
+  end
+  # Returns the instance corresponding to the provided hostname
+  def get_instance(hostname)
+    ip = Resolv.getaddress(hostname)
+    instance = @ec2.instances.find { |i| i.private_ip_address  == ip }
+    raise InstanceNotFoundException.new(hostname) if instance == nil
+    return instance
+  end
+end
+
+
 def log s
   $stderr.puts "[#{Time.now}]: #{s}"
 end
@@ -169,8 +191,8 @@ if __FILE__ == $0
   require 'trollop'
   opts = Trollop::options do
     opt :port, "Mongo port to connect to", :default => 27017
-    opt :access_key_id, "Access Key Id for AWS", :type => :string
-    opt :secret_access_key, "Secret Access Key for AWS", :type => :string
+    opt :access_key_id, "Access Key Id for AWS", :type => :string, :required => true
+    opt :secret_access_key, "Secret Access Key for AWS", :type => :string, :required => true
   end
 
   # connect to the local mongo
@@ -205,7 +227,9 @@ if __FILE__ == $0
     e = EC2VolumeSnapshoter.new(opts[:access_key_id], opts[:secret_access_key])
     e.snapshot_devices(drives)
   rescue Exception => e
+    require "pp"
     puts e.inspect
+    pp e.backtrace
   ensure
     m.unlock
     log "Unlocked mongo"
