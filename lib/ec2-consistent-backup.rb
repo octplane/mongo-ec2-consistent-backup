@@ -3,7 +3,6 @@ require 'rubygems'
 require 'mongo'
 require 'aws'
 
-
 =begin
 - check S3 credentials
 - check disk location of data
@@ -161,6 +160,7 @@ class EC2VolumeSnapshoter
 
 end
 
+# Logger to stderr
 def log s
   $stderr.puts "[#{Time.now}]: #{s}"
 end
