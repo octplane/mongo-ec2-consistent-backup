@@ -1,5 +1,12 @@
- require 'rake'
-Gem::Specification.new do |s|
+require 'rake'
+require "rake/clean"
+require 'rake/gempackagetask'
+require 'rake/rdoctask'
+
+desc "Packages up Swissr."
+task :default => :package
+
+spec = Gem::Specification.new do |s|
   s.name    = 'mongo-ec2-backup'
   s.version = '0.0.1'
   s.summary = 'Snapshot your mongodb in the EC2 cloud via RAID EBS'
@@ -20,4 +27,10 @@ Gem::Specification.new do |s|
 
   # Supress the warning about no rubyforge project
   s.rubyforge_project = 'nowarning'
+end
+
+Rake::GemPackageTask.new(spec) do |package| 
+  package.gem_spec = spec
+  # package.need_tar = true 
+  # package.need_zip = true
 end
