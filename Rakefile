@@ -8,7 +8,7 @@ task :default => :package
 
 spec = Gem::Specification.new do |s|
   s.name    = 'mongo-ec2-backup'
-  s.version = '0.0.1'
+  s.version = '0.0.2'
   s.summary = 'Snapshot your mongodb in the EC2 cloud via RAID EBS'
 
   s.author   = 'Pierre Baillet'

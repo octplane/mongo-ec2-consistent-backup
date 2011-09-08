@@ -29,14 +29,23 @@ to snapshot the data is running.
 Snapshot a list of devices on a given instance on ec2. Requires network access in order to lock and unlock Mongo
 
 ```shell
-./lock_and_snapshot.rb -a DEZFEZRG -s de234F44 --hostname server01 --devices /dev/sdl,/dev/slm
+./lock_and_snapshot.rb -a DEZFEZRG -s de234F44 --hostname server01 --devices /dev/sdl,/dev/slm --type daily --limit 4
 ```
+
+* --port, -p <i>:   Mongo port to connect to (default: 27017)
+* --access-key-id, -a <s>:   Access Key Id for AWS
+* --secret-access-key, -s <s>:   Secret Access Key for AWS
+* --devices, -d <s>:   Devices to snapshot, comma separated
+* --hostname, -h <s>:   Hostname to look for. Should resolve to a local EC2 Ip
+* --type, -t <s>:   Snapshot type, to choose among snapshot,weekly,monthly,daily,yearly (default: snapshot)
+* --limit, -l <i>:   Cleanup old snapshots to keep only limit snapshots. Default values are stored in EC2VolumeSnapshoter::KIND
+* --help, -e:   Show this message
 
 ### Tool Description
 
-* Dind instance id by resolving the hostname provided in the CLI and scanning the instances in EC2
+* Find instance id by resolving the hostname provided in the CLI and scanning the instances in EC2
 * Lock Mongo by connecting via the hostname:port provided in the parameters
-* Snapshot the disks
+* Snapshot the disks, delete old backups
 * Unlock Mongo
 
 # API

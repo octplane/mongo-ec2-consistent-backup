@@ -13,6 +13,8 @@ opts = Trollop::options do
   opt :secret_access_key, "Secret Access Key for AWS", :type => :string, :required => true
   opt :devices, "Devices to snapshot, comma separated", :type => :string, :required => true
   opt :hostname, "Hostname to look for. Should resolve to a local EC2 Ip", :type => :string, :required => true
+  opt :type, "Snapshot type, to choose among #{EC2VolumeSnapshoter::KINDS.keys.join(",")}", :default => "snapshot"
+  opt :limit, "Cleanup old snapshots to keep only limit snapshots", :type => :integer
 end
 
 # find instance id by
@@ -33,7 +35,13 @@ locker = MongoHelper::DataLocker.new(opts[:port], opts[:hostname])
 locker.lock
 begin
   snapshoter = EC2VolumeSnapshoter.new(aki, sak, instance.id)
-  snapshoter.snapshot_devices(opts[:devices].split(/,/))
+  limit = if opts[:limit] == nil
+    EC2VolumeSnapshoter::KINDS[opts[:type]]
+  else
+    opts[:limit]
+  end
+
+  snapshoter.snapshot_devices(opts[:devices].split(/,/), "Mongo Snapshot", opts[:type], limit)
 rescue Exception => e
   require "pp"
   puts e.inspect  
