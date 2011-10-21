@@ -8,7 +8,7 @@ task :default => :package
 
 spec = Gem::Specification.new do |s|
   s.name    = 'mongo-ec2-backup'
-  s.version = '0.0.2'
+  s.version = '0.0.3'
   s.summary = 'Snapshot your mongodb in the EC2 cloud via RAID EBS'
 
   s.author   = 'Pierre Baillet'
@@ -16,9 +16,9 @@ spec = Gem::Specification.new do |s|
   s.homepage = 'https://github.com/octplane/mongo-ec2-consistent-backup'
 
   # These dependencies are only for people who work on this gem
-  s.add_development_dependency 'aws'
-  s.add_development_dependency 'trollop'
-  s.add_development_dependency 'mongo'
+  s.add_dependency 'aws-sdk'
+  s.add_dependency 'trollop'
+  s.add_dependency 'mongo'
 
   # Include everything in the lib folder
   s.files = FileList['lib/**/*.rb', 'bin/*', '[A-Z]*', 'test/**/*'].to_a
