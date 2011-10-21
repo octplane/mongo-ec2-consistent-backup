@@ -250,3 +250,46 @@ end
 def log s
   $stderr.puts "[#{Time.now}]: #{s}"
 end
+
+
+if __FILE__ == $0
+  require 'trollop'
+  opts = Trollop::options do
+    opt :port, "Mongo port to connect to", :default => 27017
+  end
+
+  # First connect to mongo and find the dbpath
+  port = opts[:port]
+  m = MongoHelper::DataLocker.new(port)
+  data_location = m.path
+  log "Mongo at #{port} has its data in #{data_location}."
+  
+
+  mount_inspector = MountInspector.new
+  raid_set = mount_inspector.which_device(data_location)
+  log "This path is on the device #{raid_set}."
+
+  begin 
+    raid_sets = MDInspector.new
+    drives = raid_sets.set(raid_set)[:drives]
+
+    log "This device is the MD device built with #{drives.inspect}."
+
+    # # this code probably works, but is way to dangerous.
+    # m.lock
+    # begin
+    #   log "Locked mongo"
+    #   e = EC2VolumeSnapshoter.new(opts[:access_key_id], opts[:secret_access_key])
+    #   e.snapshot_devices(drives)
+    # rescue Exception => e
+    #   puts e.inspect
+    # ensure
+    #   m.unlock
+    #   log "Unlocked mongo"
+    # end
+    
+  rescue NoSuchSetException => e
+    log "Device #{raid_set} is not a MD device, bailing out"
+    raise e
+  end
+end
