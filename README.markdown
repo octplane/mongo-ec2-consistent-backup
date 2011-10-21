@@ -46,15 +46,14 @@ You can combine the two tools to automate daily backup of you MongoDB server:
 * Snapshot the disks, delete old backups
 * Unlock Mongo
 
-## Consistent Backup: ec2-consistent-backup.rb
+## MD inspectation: ec2-consistent-backup.rb
 
 ### Usage
 
-This ruby script implements a snapshot of a mongo database runing on an EC2 instance using RAID EBS disks. Run it from the machine on which the mongo you wish
-to snapshot the data is running.
+This script demonstrates the way it analyses Mongo DB Data path to extrac the MD device and components associated
 
 ```shell
-./ec2-consistent-backup -p 27017 -a ACCESS_KEY_ID -s SECRET_ACCESS_KEY
+./ec2-consistent-backup -p 27017 
 ```
 
 ### Tool description
@@ -62,9 +61,6 @@ to snapshot the data is running.
 * connect to mongo at port provided, retrieves dbpath
 * find what mount this dbpath corresponds to
 * use /proc/mdstat to find out which drive are corresponding to the dbpath mount disk
-* lock the mongo
-* use the EC2 api to snapshot all the disks
-* unlock the mongo
 
 # API
 
