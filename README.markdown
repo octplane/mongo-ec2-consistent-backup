@@ -46,11 +46,11 @@ You can combine the two tools to automate daily backup of you MongoDB server:
 * Snapshot the disks, delete old backups
 * Unlock Mongo
 
-## MD inspectation: ec2-consistent-backup.rb
+## MD inspection: ec2-consistent-backup.rb
 
 ### Usage
 
-This script demonstrates the way it analyses Mongo DB Data path to extrac the MD device and components associated
+This script demonstrates the way it analyses Mongo DB Data path to extract the MD device and components associated
 
 ```shell
 ./ec2-consistent-backup -p 27017 
