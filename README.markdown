@@ -19,6 +19,7 @@ Snapshot a list of devices on a given instance on ec2. Requires network access i
 * --hostname, -h <s>:   Hostname to look for. Should resolve to a local EC2 Ip
 * --type, -t <s>:   Snapshot type, to choose among snapshot,weekly,monthly,daily,yearly (default: snapshot)
 * --limit, -l <i>:   Cleanup old snapshots to keep only limit snapshots. Default values are stored in EC2VolumeSnapshoter::KIND
+* --region:   Region hosting the instances
 * --help, -e:   Show this message
 
 ### Usage in chef environment
