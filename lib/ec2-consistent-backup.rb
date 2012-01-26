@@ -142,12 +142,12 @@ class EC2VolumeSnapshoter
   attr_reader :instance_id
   # Need access_key_id, secret_access_key and instance_id
   # If not provided, attempt to fetch current instance_id
-  def initialize(aki, sak, instance_id = open("http://169.254.169.254/latest/meta-data/instance-id").read)
+  def initialize(aki, sak, region, instance_id = open("http://169.254.169.254/latest/meta-data/instance-id").read)
 
     @instance_id = instance_id
 
     @ec2 = AWS::EC2.new('access_key_id' => aki, 
-      'secret_access_key' => sak)
+      'secret_access_key' => sak).regions[region]
   end
   # Snapshots the list of devices 
   # devices is an array of device attached to the instance (/dev/foo)
@@ -233,9 +233,9 @@ require 'resolv'
 # Fetch an instance from its private ip address
 class EC2InstanceIdentifier
   # Need access_key_id, secret_access_key
-  def initialize(aki, sak)
+  def initialize(aki, sak, region)
     @ec2 = AWS::EC2.new('access_key_id' => aki, 
-      'secret_access_key' => sak)
+                        'secret_access_key' => sak).regions[region]
   end
   # Returns the instance corresponding to the provided hostname
   def get_instance(hostname)
@@ -279,7 +279,7 @@ if __FILE__ == $0
     # m.lock
     # begin
     #   log "Locked mongo"
-    #   e = EC2VolumeSnapshoter.new(opts[:access_key_id], opts[:secret_access_key])
+    #   e = EC2VolumeSnapshoter.new(opts[:access_key_id], opts[:secret_access_key], opts[:region])
     #   e.snapshot_devices(drives)
     # rescue Exception => e
     #   puts e.inspect

@@ -15,6 +15,7 @@ opts = Trollop::options do
   opt :hostname, "Hostname to look for. Should resolve to a local EC2 Ip", :type => :string, :required => true
   opt :type, "Snapshot type, to choose among #{EC2VolumeSnapshoter::KINDS.keys.join(",")}", :default => "snapshot"
   opt :limit, "Cleanup old snapshots to keep only limit snapshots", :type => :integer
+  opt :region, "Target region with instances", :type => :string
 end
 
 # find instance id by
@@ -26,15 +27,16 @@ end
 
 aki = opts[:access_key_id]
 sak = opts[:secret_access_key]
+region = opts[:region]
 
-identifier = EC2InstanceIdentifier.new(aki, sak)
+identifier = EC2InstanceIdentifier.new(aki, sak, region)
 instance = identifier.get_instance(opts[:hostname])
 
 locker = MongoHelper::DataLocker.new(opts[:port], opts[:hostname])
 
 locker.lock
 begin
-  snapshoter = EC2VolumeSnapshoter.new(aki, sak, instance.id)
+  snapshoter = EC2VolumeSnapshoter.new(aki, sak, region, instance.id)
   limit = if opts[:limit] == nil
     EC2VolumeSnapshoter::KINDS[opts[:type]]
   else
