@@ -1,6 +1,5 @@
 require 'rubygems'
 require 'mongo'
-require 'aws'
 require 'open-uri'
 
 =begin
@@ -123,134 +122,9 @@ module MongoHelper
   end
 end
 
-class EC2DeviceHasNoVolume < Exception; end
-
-# This class is responsible of the snapshoting of given disks to EC2
-# EC2 related permissions in IAM
-# * ec2:CreateSnapshot
-# * ec2:DescribeVolumes
-class EC2VolumeSnapshoter
-  NAME_PREFIX='Volume Snapshot'
-
-  # Kind of snapshot and their expiration in days
-  KINDS = { 'snapshot' => 0,
-    'daily' => 7,
-    'weekly' => 31,
-    'monthly' => 300,
-    'yearly' => 0}
-
-  attr_reader :instance_id
-  # Need access_key_id, secret_access_key and instance_id
-  # If not provided, attempt to fetch current instance_id
-  def initialize(aki, sak, region, instance_id = open("http://169.254.169.254/latest/meta-data/instance-id").read)
-
-    @instance_id = instance_id
-
-    @ec2 = AWS::EC2.new('access_key_id' => aki, 
-      'secret_access_key' => sak).regions[region]
-  end
-  # Snapshots the list of devices 
-  # devices is an array of device attached to the instance (/dev/foo)
-  # name if the name of the snapshot
-  def snapshot_devices(devices, name = "#{instance_id}", kind = "snapshot", limit = KINDS['kind'])
-    log "Snapshot of kind #{kind}, limit set to #{limit} (0 means never purge)"
-    ts = DateTime.now.to_s
-    name = "#{NAME_PREFIX}:" + name
-    volumes = {}
-    devices.each do |device|
-      volumes[device] = find_volume_for_device(device)
-    end
-    volumes.each do |device, volume|
-      log "Creating volume snapshot for #{device} on instance #{instance_id}"
-      snapshot = volume.create_snapshot(name+" #{device}")
-      snapshot.add_tag("application", :value => NAME_PREFIX)
-      snapshot.add_tag("device", :value => device)
-      snapshot.add_tag("instance_id", :value =>instance_id)
-      snapshot.add_tag("date", :value => ts)
-      snapshot.add_tag("kind", :value => kind)
-    end
-
-    if limit != 0
-      # populate data structure with updated information
-      snapshots = list_snapshots(devices, kind)
-      nsnaps = snapshots.keys.length
-      if nsnaps-limit > 0
-        dates = snapshots.keys.sort
-        puts dates.inspect
-        extra_snapshots = dates[0..-limit]
-        remaining_snapshots = dates[-limit..-1]
-        extra_snapshots.each do |date|
-          snapshots[date].each do |snap|
-            log "Deleting #{snap.description} #{snap.id}"
-            snap.delete
-         end
-        end
-      end
-    end
-
-  end
-
-  # List snapshots for a set of device and a given kind
-  require 'pp'
-  def list_snapshots(devices, kind)
-    volume_map = []
-    snapshots = {}
-
-    @ec2.snapshots.restorable_by(:self).each do |s|
-      t = s.tags.to_h
-      if devices.include?(t['device']) && 
-        instance_id == t['instance_id'] &&
-        NAME_PREFIX == t['application'] &&
-        kind == t['kind']
-        snapshots[t['date']] ||= []
-        snapshots[t['date']] << s
-      end
-    end
-
-    # take out incomplete backups
-    snapshots.delete_if{ |date, snaps| snaps.length != devices.length }
-
-    snapshots
-  end
-
-
-  private
-  def find_volume_for_device(device)
-
-    @ec2.volumes.each do |volume|
-      volume.attachments.each do |attachment|
-        if attachment.device == device && attachment.instance.id == instance_id
-          return volume
-        end
-      end
-    end
-    raise EC2DeviceHasNoVolume.new(device)
-  end
-end
-
-class InstanceNotFoundException < Exception; end
-require 'resolv'
-# Fetch an instance from its private ip address
-class EC2InstanceIdentifier
-  # Need access_key_id, secret_access_key
-  def initialize(aki, sak, region)
-    @ec2 = AWS::EC2.new('access_key_id' => aki, 
-                        'secret_access_key' => sak).regions[region]
-  end
-  # Returns the instance corresponding to the provided hostname
-  def get_instance(hostname)
-    ip = Resolv.getaddress(hostname)
-    instance = @ec2.instances.find { |i| i.private_ip_address  == ip || i.ip_address == ip }
-    raise InstanceNotFoundException.new(hostname) if instance == nil
-    return instance
-  end
-end
-
-
 def log s
   $stderr.puts "[#{Time.now}]: #{s}"
 end
-
 
 if __FILE__ == $0
   require 'trollop'
