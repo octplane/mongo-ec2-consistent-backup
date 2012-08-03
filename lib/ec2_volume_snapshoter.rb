@@ -64,7 +64,6 @@ class EC2VolumeSnapshoter
       @compute.tags.create(:resource_id => snapshot.id, :key =>"date", :value => ts)
       @compute.tags.create(:resource_id => snapshot.id, :key =>"kind", :value => kind)
 
-      end
     end
     sn.each do |s|
       begin
