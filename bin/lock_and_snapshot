@@ -15,7 +15,6 @@ opts = Trollop::options do
   opt :access_key_id, "Access Key Id for AWS", :type => :string, :required => true
   opt :secret_access_key, "Secret Access Key for AWS", :type => :string, :required => true
   opt :devices, "Devices to snapshot, comma separated", :type => :string, :required => true
-  opt :hostname, "Hostname to look for. Should resolve to a local EC2 Ip", :type => :string, :required => true
   opt :type, "Snapshot type, to choose among #{EC2VolumeSnapshoter::KINDS.keys.join(",")}", :default => "snapshot"
   opt :limit, "Cleanup old snapshots to keep only limit snapshots", :type => :integer
 end
@@ -31,13 +30,10 @@ aki = opts[:access_key_id]
 sak = opts[:secret_access_key]
 path = opts[:path]
 
-identifier = EC2InstanceIdentifier.new(aki, sak)
-instance = identifier.get_instance(opts[:hostname])
-
 `xfs_freeze -f #{path}`
 
 begin
-  snapshoter = EC2VolumeSnapshoter.new(aki, sak, instance.id)
+  snapshoter = EC2VolumeSnapshoter.new(aki, sak)
   limit = if opts[:limit] == nil
     EC2VolumeSnapshoter::KINDS[opts[:type]]
   else
