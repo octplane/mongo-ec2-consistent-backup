@@ -49,11 +49,13 @@ class EC2VolumeSnapshoter
     devices.each do |device|
       volumes[device] = find_volume_for_device(device)
     end
+    sn = []
     volumes.each do |device, volume|
       log "Creating volume snapshot for #{device} on instance #{instance_id}"
       snapshot = volume.snapshots.new
       snapshot.description = name+" #{device}"
       snapshot.save
+      sn << snapshot
       snapshot.reload
 
       @compute.tags.create(:resource_id => snapshot.id, :key =>"application", :value => NAME_PREFIX)
@@ -62,6 +64,13 @@ class EC2VolumeSnapshoter
       @compute.tags.create(:resource_id => snapshot.id, :key =>"date", :value => ts)
       @compute.tags.create(:resource_id => snapshot.id, :key =>"kind", :value => kind)
 
+      end
+    end
+    sn.each do |s|
+      begin
+        sleep(3)
+        s.reload
+      end while s.state == 'nil' || s.state == 'pending'
     end
 
     if limit != 0
