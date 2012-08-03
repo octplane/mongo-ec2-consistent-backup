@@ -6,6 +6,7 @@ require 'trollop'
 
 $: << File.join("..", File.dirname(__FILE__), "lib")
 require 'ec2-consistent-backup'
+require 'ec2_volume_snapshoter'
 
 opts = Trollop::options do
   opt :path, "Data path to freeze", :type => :string, :required => true
