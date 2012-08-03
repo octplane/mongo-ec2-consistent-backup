@@ -30,7 +30,7 @@ aki = opts[:access_key_id]
 sak = opts[:secret_access_key]
 path = opts[:path]
 
-`xfs_freeze -f #{path}`
+`/usr/sbin/xfs_freeze -f #{path}`
 
 begin
   snapshoter = EC2VolumeSnapshoter.new(aki, sak)
@@ -46,5 +46,5 @@ rescue Exception => e
   puts e.inspect  
   pp e.backtrace
 ensure
-  `xfs_freeze -u #{path}`
+  `/usr/sbin/xfs_freeze -u #{path}`
 end
