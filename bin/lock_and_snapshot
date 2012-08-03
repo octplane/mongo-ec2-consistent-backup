@@ -8,14 +8,13 @@ $: << File.join("..", File.dirname(__FILE__), "lib")
 require 'ec2-consistent-backup'
 
 opts = Trollop::options do
-  opt :port, "Mongo port to connect to", :default => 27017
+  opt :path, "Data path to freeze", :type => :string, :required => true
   opt :access_key_id, "Access Key Id for AWS", :type => :string, :required => true
   opt :secret_access_key, "Secret Access Key for AWS", :type => :string, :required => true
   opt :devices, "Devices to snapshot, comma separated", :type => :string, :required => true
   opt :hostname, "Hostname to look for. Should resolve to a local EC2 Ip", :type => :string, :required => true
   opt :type, "Snapshot type, to choose among #{EC2VolumeSnapshoter::KINDS.keys.join(",")}", :default => "snapshot"
   opt :limit, "Cleanup old snapshots to keep only limit snapshots", :type => :integer
-  opt :region, "Target region with instances", :type => :string
 end
 
 # find instance id by
@@ -27,16 +26,15 @@ end
 
 aki = opts[:access_key_id]
 sak = opts[:secret_access_key]
-region = opts[:region]
+path = opts[:path]
 
-identifier = EC2InstanceIdentifier.new(aki, sak, region)
+identifier = EC2InstanceIdentifier.new(aki, sak)
 instance = identifier.get_instance(opts[:hostname])
 
-locker = MongoHelper::DataLocker.new(opts[:port], opts[:hostname])
+`xfs_freeze -f #{path}`
 
-locker.lock
 begin
-  snapshoter = EC2VolumeSnapshoter.new(aki, sak, region, instance.id)
+  snapshoter = EC2VolumeSnapshoter.new(aki, sak, instance.id)
   limit = if opts[:limit] == nil
     EC2VolumeSnapshoter::KINDS[opts[:type]]
   else
@@ -49,5 +47,5 @@ rescue Exception => e
   puts e.inspect  
   pp e.backtrace
 ensure
-  locker.unlock
+  `xfs_freeze -u #{path}`
 end
