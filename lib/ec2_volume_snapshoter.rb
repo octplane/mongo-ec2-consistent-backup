@@ -69,6 +69,7 @@ class EC2VolumeSnapshoter
       begin
         sleep(3)
         s.reload
+        puts s.state
       end while s.state == 'nil' || s.state == 'pending'
     end
 
