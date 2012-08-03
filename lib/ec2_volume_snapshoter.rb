@@ -65,11 +65,11 @@ class EC2VolumeSnapshoter
       @compute.tags.create(:resource_id => snapshot.id, :key =>"kind", :value => kind)
 
     end
+    log "Waiting for snapshot to complete."
     sn.each do |s|
       begin
         sleep(3)
         s.reload
-        puts s.state
       end while s.state == 'nil' || s.state == 'pending'
     end
 
