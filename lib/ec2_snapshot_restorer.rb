@@ -16,23 +16,29 @@ class SnapshotRestorer
     @snaps = []
     @volumes = []
   end
-  def find_snapshots(instance_id)
+  def find_snapshots(instance_id, kind = 'snapshot')
     log "Looking for snapshots for #{instance_id}"
     volume_map = []
     snapshots = {}
 
     tags = @compute.tags.all(:key => 'instance_id', :value => instance_id)
+
+    max_date = nil
     tags.each do |tag|
       snap = @compute.snapshots.get(tag.resource_id)
       t =  snap.tags
 
       # Ignore in progress snapshots
-      if instance_id == t['instance_id'] && snap.state == 'completed'
+      if instance_id == t['instance_id'] && 
+          snap.state == 'completed' &&
+          t['kind'] == kind
+        max_date = t['date'] if !max_date || max_date < t['date']
         log "#{snap.inspect} is valid"
         snapshots[t['date']] ||= []
         snapshots[t['date']] << snap
       end
     end
+    snapshots['LATEST'] = snapshots[max_date] if snapshots[max_date]
     return snapshots
   end
   def prepare_volumes(dest_instance)
@@ -83,7 +89,8 @@ if __FILE__ == $0
     opt :hostname, "Hostname tag to use to find the instance", :type => :string, :required => true
     opt :access_key_id, "Access Key Id for AWS", :type => :string, :required => true
     opt :secret_access_key, "Secret Access Key for AWS", :type => :string, :required => true
-    opt :date, "Date to restore", :type => :string
+    opt :date, "Date to restore, use LATEST to take latest data", :type => :string
+    opt :type, "Snapshot type to restore, defaults to snapshot", :type => :string, :default => 'snapshot'
     opt :target, "Creates volume ready for mounting on instance id. Use special value SELF to restore here", :type => :string
     opt :first_device, "First device to attach to (default is to use source first device) /dev/sdx", :type => :string
   end
@@ -93,7 +100,7 @@ if __FILE__ == $0
   s = SnapshotRestorer.new(opts[:access_key_id], opts[:secret_access_key])
 
   # Find this instance snapshots
-  snaps = s.find_snapshots(instance_identifier)
+  snaps = s.find_snapshots(instance_identifier, opts[:type])
 
   if ! opts[:date] || !snaps.has_key?(opts[:date])
     puts "We have found the following snapshot's dates:"

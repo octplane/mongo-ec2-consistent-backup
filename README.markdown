@@ -21,4 +21,19 @@ Snapshot a list of devices on a given instance on ec2.
 
 It freeze the path using ```xfs_freeze```and create a snapshot for all the disks passed in the command line. To make this work without too much trouble with a mongo that is in a replica set, you can shut down the replica before running the command. You can also use mongo fsync and lock but this will probably make your cluster a bit nervous about that. Shutting down ensure no mongos will try to use the frozen mongo.
 
+### Usage with IAM
+
+If you use IAM for your authentication in EC2, here is a probably up to date list of the permissions you need to grant:
+
+```
+  "ec2:CreateSnapshot",
+  "ec2:DeleteSnapshot",
+  "ec2:DescribeSnapshots",
+  "ec2:CreateTags",
+  "ec2:DescribeTags",
+  "ec2:DescribeVolumes",
+  "ec2:DescribeInstances",
+  "ec2:AttachVolume",
+  "ec2:CreateVolume"
+```
 Internal API documentation is at: http://rubydoc.info/github/octplane/mongo-ec2-consistent-backup/master/frames
