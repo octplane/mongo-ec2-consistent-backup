@@ -3,8 +3,21 @@ require 'open-uri'
 
 # This class is responsible of the snapshoting of given disks to EC2
 # EC2 related permissions in IAM
-# * ec2:CreateSnapshot
-# * ec2:DescribeVolumes
+# Sid": "Stmt1344254048404",
+#      "Action": [
+#        "ec2:CreateSnapshot",
+#        "ec2:DeleteSnapshot",
+#        "ec2:DescribeSnapshots",
+#        "ec2:CreateTags",
+#        "ec2:DescribeTags",
+#        "ec2:DescribeVolumes"
+#      ],
+#      "Effect": "Allow",
+#      "Resource": [
+#        "*"
+#      ]
+#
+
 class NoSuchVolumeException < Exception
   def initialize(instance, volume, details)
     @instance, @volume, @details = instance, volume, details
@@ -65,7 +78,7 @@ class EC2VolumeSnapshoter
       @compute.tags.create(:resource_id => snapshot.id, :key =>"kind", :value => kind)
 
     end
-    log "Waiting for snapshot to complete."
+    log "Waiting for snapshots to complete."
     sn.each do |s|
       begin
         sleep(3)
@@ -131,8 +144,6 @@ class EC2VolumeSnapshoter
     raise NoSuchVolumeException.new(@instance_id, device, my)
   end
 end
-
-
 
 if __FILE__ == $0
   require 'trollop'
