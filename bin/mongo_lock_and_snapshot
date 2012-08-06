@@ -1,0 +1,50 @@
+#!/usr/bin/env ruby
+# Lock a set of disk via the mongo lock command and snapshot them to the cloud
+
+require 'rubygems'
+ENV['BUNDLE_GEMFILE'] =  File.join(File.dirname(__FILE__), "..", "Gemfile")
+require 'bundler/setup'
+require 'trollop'
+
+$: << File.join("..", File.dirname(__FILE__), "lib")
+require 'ec2-consistent-backup'
+require 'ec2_volume_snapshoter'
+
+opts = Trollop::options do
+  opt :path, "Data path to freeze", :type => :string, :required => true
+  opt :access_key_id, "Access Key Id for AWS", :type => :string, :required => true
+  opt :secret_access_key, "Secret Access Key for AWS", :type => :string, :required => true
+  opt :devices, "Devices to snapshot, comma separated", :type => :string, :required => true
+  opt :type, "Snapshot type, to choose among #{EC2VolumeSnapshoter::KINDS.keys.join(",")}", :default => "snapshot"
+  opt :limit, "Cleanup old snapshots to keep only limit snapshots", :type => :integer
+end
+
+# find instance id by
+#  - resolving name to ip
+#  - looking in EC2 for server
+# Lock Mongo
+# Snapshot
+# Unlock
+
+aki = opts[:access_key_id]
+sak = opts[:secret_access_key]
+path = opts[:path]
+
+`/usr/sbin/xfs_freeze -f #{path}`
+
+begin
+  snapshoter = EC2VolumeSnapshoter.new(aki, sak)
+  limit = if opts[:limit] == nil
+    EC2VolumeSnapshoter::KINDS[opts[:type]]
+  else
+    opts[:limit]
+  end
+
+  snapshoter.snapshot_devices(opts[:devices].split(/,/), "Mongo Snapshot", opts[:type], limit)
+rescue Exception => e
+  require "pp"
+  puts e.inspect  
+  pp e.backtrace
+ensure
+  `/usr/sbin/xfs_freeze -u #{path}`
+end
