@@ -8,7 +8,7 @@ task :default => :package
 
 spec = Gem::Specification.new do |s|
   s.name    = 'mongo-ec2-backup'
-  s.version = '0.0.4'
+  s.version = '0.0.5'
   s.summary = 'Snapshot your mongodb in the EC2 cloud via XFS Freeze'
 
   s.author   = 'Pierre Baillet'
@@ -25,6 +25,7 @@ spec = Gem::Specification.new do |s|
   s.files = FileList['lib/**/*.rb', 'bin/*', '[A-Z]*', 'test/**/*'].to_a
 
   s.executables << "mongo_lock_and_snapshot"
+  s.executables << "ec2_snapshot_restorer"
 
   # Supress the warning about no rubyforge project
   s.rubyforge_project = 'nowarning'
