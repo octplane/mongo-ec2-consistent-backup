@@ -6,20 +6,40 @@ Suite of tools to backup and manage snapshots of MongoDB data set to EC2 Snapsho
 
 ### Usage
 
-Snapshot a list of devices on a given instance on ec2.
+#### Snapshot a list of devices on a given instance on ec2.
 
 ```shell
-/mnt/lib/mongo-ec2-consistent-backup/bin# infra-ruby lock_and_snapshot -p /ebs/lvms/lvol0/ -a ACCESS_KEY -s SECRET_KEY -d /dev/sdg,/dev/sdh,/dev/sdi,/dev/sdj,/dev/sdk,/dev/sdl,/dev/sdm,/dev/sdn
+mongo_lock_and_snapshot -t daily -p /ebs/lvms/lvol0/ -a $AWS_ACCESS_KEY -s $AWS_SECRET_ACCESS_KEY -d /dev/sdg,/dev/sdh,/dev/sdi,/dev/sdj,/dev/sdk,/dev/sdl,/dev/sdm,/dev/sdn
 ```
 
-* --path, -p :   Data path to freeze
-* --access-key-id, -a :   Access Key Id for AWS
-* --secret-access-key, -s :   Secret Access Key for AWS
-* --devices, -d :   Devices to snapshot, comma separated
-* --type, -t :   Snapshot type, to choose among test,snapshot,daily,weekly,monthly,yearly (default: snapshot)
-* --help, -h:   Show this message
-
 It freeze the path using ```xfs_freeze```and create a snapshot for all the disks passed in the command line. To make this work without too much trouble with a mongo that is in a replica set, you can shut down the replica before running the command. You can also use mongo fsync and lock but this will probably make your cluster a bit nervous about that. Shutting down ensure no mongos will try to use the frozen mongo.
+
+#### Restore snapshots 
+
+```shell
+ec2_snapshot_restorer -a ACCESS_KEY  -s SECRET_KEY -h source_server_name -r dest_server_instance_id_or_SELF -d LATEST -f /dev/sdj -t daily
+```
+
+* Restores the ```daily``` snapshots from date ```LATEST``` that have been made on ```source_server_name``` on instance ```dest_server_instance_id_or_SELF``` on devices ```/dev/sdj``` and following.
+
+#### Destroy and remove volumes
+
+Ensure the volume are not busy (for example if this is a LVM volume):
+
+```shell
+umount /ebs/lvms/vol0/
+lvremove -f /dev/vol0/lvol0
+vgremove vol0
+pvremove /dev/sd{j,k,l,m,n,o,p,q}
+```
+
+Once this is done, you can disconnect and destroy the volumes:
+
+```shell
+ec2_snapshot_restorer -a $AWS_ACCESS_KEY -s $AWS_SECRET_ACCESS_KEY -h source_server_name -r dest_server_instance_id_or_SELF -d LATEST -f /dev/sdj -c destroy
+```
+
+This will force detach and destroy all the volumes previously connected for the corresponding snapshot.
 
 ### Usage with IAM
 
