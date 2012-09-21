@@ -1,12 +1,14 @@
 #!/usr/bin/env ruby
 
 require 'rubygems'
-require 'bundler/setup'
 require 'trollop'
 require 'fog'
 require 'open-uri'
-
+require 'trollop'
+require 'pp'
 $: << File.join(File.dirname(__FILE__), "../lib")
+require 'ec2_instance_identifier'
+
 
 DEBUG=false
 
@@ -69,26 +71,55 @@ class SnapshotRestorer
       
       @volumes << volume
     end
-    def rattach_volumes(base_device = nil)
-      dest = base_device
-      if !dest
-        dest = @volumes.map{ |v| v.tags['sdevice']}.min
-      end
-      dest = dest.dup
+  end
+  def rattach_volumes(base_device = nil)
+    dest = base_device
+    if !dest
+      dest = @volumes.map{ |v| v.tags['sdevice']}.min
+    end
+    dest = dest.dup
 
-      @volumes.each do |vol|
-        vol.reload
-        puts "Attaching #{vol.id} to #{dest} on #{vol.tags['dinstance']}"
-        @compute.attach_volume(vol.tags['dinstance'], vol.id, dest)
-        dest.next!
+    @volumes.each do |vol|
+      vol.reload
+      puts "Attaching #{vol.id} to #{dest} on #{vol.tags['dinstance']}"
+      @compute.attach_volume(vol.tags['dinstance'], vol.id, dest)
+      dest.next!
+    end
+  end
+  def find_volume_for_instance_and_snapshots(dest_instance)
+    vols = []
+    @snaps.each do | resource_id |
+      @compute.volumes.all().each do |volume|
+        if volume.server_id == dest_instance &&
+          volume.snapshot_id == resource_id
+          vols << volume
+        end
       end
+    end
+    return vols
+  end
+  def detach_snapshots(dest_instance)
+    vols = find_volume_for_instance_and_snapshots(dest_instance)
+    if vols.length == 0
+      puts "Nothing to detach!"
+      return
+    end
+    vols.each { |v|
+      v.force_detach()
+    }
+    puts "Waiting for volumes to be detached"
+    vols.each do |v|
+      begin
+        sleep(3)
+        v.reload
+      end while v.state == 'in-use'
+      puts "#{v.id} is detached"
+      v.destroy()
     end
   end
 end
 
-require 'trollop'
-require 'ec2_instance_identifier'
-require 'pp'
+
 opts = Trollop::options do
   opt :hostname, "Hostname tag to use to find the instance", :type => :string, :required => true
   opt :access_key_id, "Access Key Id for AWS", :type => :string, :required => true
@@ -97,6 +128,7 @@ opts = Trollop::options do
   opt :type, "Snapshot type to restore, defaults to snapshot", :type => :string, :default => 'snapshot'
   opt :target, "Creates volume ready for mounting on instance id. Use special value SELF to restore here", :type => :string
   opt :first_device, "First device to attach to (default is to use source first device) /dev/sdx", :type => :string
+  opt :action, 'Action', :default => 'attach'
 end
   
 finder = EC2InstanceIdentifier.new(opts[:access_key_id], opts[:secret_access_key])
@@ -120,10 +152,18 @@ else
     s.snaps = snaps[opts[:date]].map{ |s| s.id }
     target = opts[:target]
     target = open("http://169.254.169.254/latest/meta-data/instance-id").read if target == "SELF"
-    puts "Preparing volumes for instance #{target}"
-    s.prepare_volumes(target)
-    # Need to clone, because trollop freeze the variable
-    s.rattach_volumes(opts[:first_device])
+    if opts[:action] == 'attach'
+      if !opts[:first_device]
+        raise "First device has to be indicated"
+      end
+      puts "Preparing volumes for instance #{target}"
+      s.prepare_volumes(target)
+      # Need to clone, because trollop freeze the variable
+
+      s.rattach_volumes(opts[:first_device])
+    elsif opts[:action] == 'destroy'
+      s.detach_snapshots(target)
+    end
   end
 end
 
