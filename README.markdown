@@ -1,4 +1,4 @@
-# Mongo consistent backup over RAID EBS disks on EC2 instance
+# Mongo consistent backup over LVM disks on EC2 instance
 
 Suite of tools to backup and manage snapshots of MongoDB data set to EC2 Snapshots.
 
@@ -24,7 +24,7 @@ ec2_snapshot_restorer -a ACCESS_KEY  -s SECRET_KEY -h source_server_name -r dest
 
 #### Destroy and remove volumes
 
-Ensure the volume are not busy (for example if this is a LVM volume):
+Ensure the volumes are not busy (for example if this is a LVM LV):
 
 ```shell
 umount /ebs/lvms/vol0/
