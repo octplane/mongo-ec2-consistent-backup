@@ -9,22 +9,20 @@ class EC2Helper
   def initialize(aki, sak)
     @aki = aki
     @sak = sak
-    @gettoken = false
+    @token = nil
   end
 
   def connection
-    if token.nil?
-      {:provider => 'AWS', :aws_access_key_id => access_key, :aws_secret_access_key => secret_key, :region => region}
-    else
-      {:provider => 'AWS', :aws_access_key_id => access_key, :aws_secret_access_key => secret_key, :aws_session_token => token, :region => region}
-    end
+    connection = {:provider => 'AWS', :aws_access_key_id => access_key, :aws_secret_access_key => secret_key, :region => region}
+    connection.merge!({ :aws_session_token => @token }) unless @token.nil?
+    connection
   end
 
   def access_key
     if @aki.nil?
       creds = get_creds_from_metadata
       @aki = creds['AccessKeyId']
-      @gettoken = true
+      @token = creds['Token']
     end
     @aki
   end
@@ -33,13 +31,13 @@ class EC2Helper
     if @sak.nil?
       creds = get_creds_from_metadata
       @sak = creds['SecretAccessKey']
-      @gettoken = true
+      @token = creds['Token']
     end
     @sak
   end
 
   def token
-    get_creds_from_metadata['Token]'] if @gettoken
+    get_creds_from_metadata['Token']
   end
 
   def iam_role
@@ -57,7 +55,7 @@ class EC2Helper
   def availability_zone
     open('http://169.254.169.254/latest/meta-data/placement/availability-zone').readline
   end
-  
+
   private
 
   def get_creds_from_metadata
