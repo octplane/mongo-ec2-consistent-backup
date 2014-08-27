@@ -1,6 +1,7 @@
 require 'rubygems'
 require 'mongo'
-require 'open-uri'
+$: << File.join(File.dirname(__FILE__), "../lib")
+require 'ec2_helper'
 
 =begin
 - check S3 credentials
@@ -8,7 +9,6 @@ require 'open-uri'
 - check this is on a remotely mounted disk (or md drive)
 - http://www.mongodb.org/display/DOCS/getCmdLineOpts+command
 =end
-
 
 =begin
 /proc/mdstat content:
@@ -19,7 +19,9 @@ md0 : active raid0 sdo[3] sdn[2] sdm[1] sdl[0]
       
 unused devices: <none>
 =end
+
 class NoSuchSetException < Exception; end
+
 # Parse the existing RAID sets by reading /prod/mdstat
 # Cheap alternative to using FFI to interface with libdm
 class MDInspector
@@ -27,6 +29,7 @@ class MDInspector
   PERSONALITIES = "Personalities :"
   attr_reader :has_md, :personalities
   attr_reader :drives
+
   def initialize(mdfile = MDFILE)
     @has_md = false
     if File.exists?(mdfile)
@@ -50,6 +53,7 @@ class MDInspector
       @has_md = true if @set_metadata.keys.length > 0
     end
   end
+
   # Returns the information about the MD set @name
   def set(name)
     # Handle "/dev/foobar" instead of "foobar"
@@ -62,6 +66,7 @@ class MDInspector
 end
 
 class NotMountedException < Exception; end
+
 class MountInspector
   def initialize(file = '/etc/mtab')
     @dev_to_fs = {}
@@ -71,10 +76,12 @@ class MountInspector
       @fs_to_dev[m[1]] = m[0] if m[1] != "none"
     end
   end
+
   def where_is_mounted(device)
     return @dev_to_fs[device] if @dev_to_fs.has_key?(device) 
     raise NotMountedException.new(device)
   end
+
   def which_device(folder)
     # Level 0 optimisation+ Handle "/" folder
     return @fs_to_dev[folder] if @fs_to_dev.has_key?(folder)
@@ -92,6 +99,7 @@ end
 module MongoHelper
   class DataLocker
     attr_reader :path
+
     def initialize(port = 27017, host = 'localhost')
       @m = Mongo::Connection.new(host, port)
       args =  @m['admin'].command({'getCmdLineOpts' => 1 })['argv']
@@ -100,6 +108,7 @@ module MongoHelper
       @path = File.readlink(@path) if File.symlink?(@path)
 
     end
+
     def lock
       return if locked?
       @m.lock!
@@ -108,9 +117,11 @@ module MongoHelper
       end
       raise "Not locked as asked" if !locked?
     end
+
     def locked?
       @m.locked?
     end
+
     def unlock
       return if !locked?
       raise "Already unlocked" if !locked?
@@ -149,19 +160,6 @@ if __FILE__ == $0
 
     log "This device is the MD device built with #{drives.inspect}."
 
-    # # this code probably works, but is way to dangerous.
-    # m.lock
-    # begin
-    #   log "Locked mongo"
-    #   e = EC2VolumeSnapshoter.new(opts[:access_key_id], opts[:secret_access_key], opts[:region])
-    #   e.snapshot_devices(drives)
-    # rescue Exception => e
-    #   puts e.inspect
-    # ensure
-    #   m.unlock
-    #   log "Unlocked mongo"
-    # end
-    
   rescue NoSuchSetException => e
     log "Device #{raid_set} is not a MD device, bailing out"
     raise e
