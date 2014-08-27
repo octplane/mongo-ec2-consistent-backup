@@ -43,6 +43,9 @@ This will force detach and destroy all the volumes previously connected for the 
 
 ### Usage with IAM
 
+Note that the -a and -s (access key and secret key) flags are no longer required.
+If you have set up an IAM instance role for your instance, the backup and restore commands will retrieve temporary AWS credentials from the Instance Metadata Service.
+
 If you use IAM for your authentication in EC2, here is a probably up to date list of the permissions you need to grant:
 
 ```
