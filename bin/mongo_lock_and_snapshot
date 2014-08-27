@@ -6,15 +6,15 @@ require 'bundler/setup'
 require 'trollop'
 
 $: << File.join("..", File.dirname(__FILE__), "lib")
-require 'ec2-consistent-backup'
-require 'ec2_volume_snapshoter'
+require 'ec2_consistent_backup'
+require 'ec2_volume_snapshotter'
 
 opts = Trollop::options do
   opt :path, "Data path to freeze", :type => :string, :required => true
-  opt :access_key_id, "Access Key Id for AWS", :type => :string, :required => true
-  opt :secret_access_key, "Secret Access Key for AWS", :type => :string, :required => true
+  opt :access_key_id, "Access Key Id for AWS", :type => :string
+  opt :secret_access_key, "Secret Access Key for AWS", :type => :string
   opt :devices, "Devices to snapshot, comma separated", :type => :string, :required => true
-  opt :type, "Snapshot type, to choose among #{EC2VolumeSnapshoter::KINDS.keys.join(",")}", :default => "snapshot"
+  opt :type, "Snapshot type, to choose among #{EC2VolumeSnapshotter::KINDS.keys.join(",")}", :default => "snapshot"
   opt :limit, "Cleanup old snapshots to keep only limit snapshots", :type => :integer
 end
 
@@ -32,14 +32,14 @@ path = opts[:path]
 `/usr/sbin/xfs_freeze -f #{path}`
 
 begin
-  snapshoter = EC2VolumeSnapshoter.new(aki, sak)
+  snapshotter = EC2VolumeSnapshotter.new(aki, sak)
   limit = if opts[:limit] == nil
-    EC2VolumeSnapshoter::KINDS[opts[:type]]
+    EC2VolumeSnapshotter::KINDS[opts[:type]]
   else
     opts[:limit]
   end
 
-  snapshoter.snapshot_devices(opts[:devices].split(/,/), "Mongo Snapshot", opts[:type], limit)
+  snapshotter.snapshot_devices(opts[:devices].split(/,/), "Mongo Snapshot", opts[:type], limit)
 rescue Exception => e
   require "pp"
   puts e.inspect  
