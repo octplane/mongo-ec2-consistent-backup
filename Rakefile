@@ -1,14 +1,14 @@
 require 'rake'
 require "rake/clean"
-require 'rake/gempackagetask'
-require 'rake/rdoctask'
+require 'rubygems/package_task'
+require 'rdoc/task'
 
 desc "Packages up the gem."
 task :default => :package
 
 spec = Gem::Specification.new do |s|
   s.name    = 'mongo-ec2-backup'
-  s.version = '0.0.8'
+  s.version = '0.0.9'
   s.summary = 'Snapshot your mongodb in the EC2 cloud via XFS Freeze'
 
   s.author   = 'Pierre Baillet'
@@ -20,6 +20,7 @@ spec = Gem::Specification.new do |s|
   s.add_dependency 'bson_ext'
   s.add_dependency 'trollop'
   s.add_dependency 'mongo'
+  s.add_dependency 'json'
 
   # Include everything in the lib folder
   s.files = FileList['lib/**/*.rb', 'bin/*', '[A-Z]*', 'test/**/*'].to_a
@@ -31,7 +32,7 @@ spec = Gem::Specification.new do |s|
   s.rubyforge_project = 'nowarning'
 end
 
-Rake::GemPackageTask.new(spec) do |package| 
+Gem::PackageTask.new(spec) do |package|
   package.gem_spec = spec
   # package.need_tar = true 
   # package.need_zip = true
