@@ -50,8 +50,8 @@ class SnapshotRestorer
     return snapshots
   end
 
-  def prepare_volumes(dest_instance)
-    @snaps.each do | resource_id |
+  def prepare_volumes(dest_instance, piops = nil)
+    @snaps.each do |resource_id|
       snap = @compute.snapshots.get(resource_id)
       # Snap have the following tags
       # application
@@ -61,7 +61,11 @@ class SnapshotRestorer
       # kind
 
       t =  snap.tags
-      volume = @compute.volumes.new :snapshot_id => snap.id, :size => snap.volume_size, :availability_zone => @ec2.availability_zone
+      if piops
+        volume = @compute.volumes.new :snapshot_id => snap.id, :size => snap.volume_size, :availability_zone => @ec2.availability_zone, :type => 'io1', :iops => piops
+      else
+        volume = @compute.volumes.new :snapshot_id => snap.id, :size => snap.volume_size, :availability_zone => @ec2.availability_zone
+      end
       volume.save
       volume.reload
       @compute.create_tags(volume.id, { "application" => t['application'],
@@ -137,6 +141,7 @@ opts = Trollop::options do
   opt :type, "Snapshot type to restore, defaults to snapshot", :type => :string, :default => 'snapshot'
   opt :target, "Creates volume ready for mounting on instance id. Use special value SELF to restore here", :type => :string
   opt :first_device, "First device to attach to (default is to use source first device) /dev/sdx", :type => :string
+  opt :provisioned_iops, "Creates provisioned IOPS volumes from snapshots.  Supply an IOPS value.", :type => :integer
   opt :action, 'Action', :default => 'attach'
 end
   
@@ -165,7 +170,7 @@ else
         raise "First device has to be indicated"
       end
       puts "Preparing volumes for instance #{target}"
-      s.prepare_volumes(target)
+      s.prepare_volumes(target, opts[:provisioned_iops])
       # Need to clone, because trollop freeze the variable
 
       s.rattach_volumes(opts[:first_device])
