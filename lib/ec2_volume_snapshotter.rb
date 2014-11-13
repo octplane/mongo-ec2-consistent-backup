@@ -57,7 +57,7 @@ class EC2VolumeSnapshotter
   # Snapshots the list of devices 
   # devices is an array of device attached to the instance (/dev/foo)
   # name if the name of the snapshot
-  def snapshot_devices(devices, name = "#{@instance_id}", kind = "test", limit = KINDS[kind], comment=nil)
+  def snapshot_devices(devices, name = "#{@instance_id}", kind = "test", limit = KINDS[kind], comments = {})
 
     log "Snapshot of kind #{kind}, limit set to #{limit} (0 means never purge)"
     ts = DateTime.now.to_s
@@ -80,9 +80,13 @@ class EC2VolumeSnapshotter
       @compute.tags.create(:resource_id => snapshot.id, :key =>"instance_id", :value =>@instance_id)
       @compute.tags.create(:resource_id => snapshot.id, :key =>"date", :value => ts)
       @compute.tags.create(:resource_id => snapshot.id, :key =>"kind", :value => kind)
-      @compute.tags.create(:resource_id => snapshot.id, :key =>"comment", :value => comment.to_s)
-
-
+      if comments.is_a? Hash
+        comments.each do |k, v = nil|
+          @compute.tags.create(:resource_id => snapshot.id, :key => k, :value => v)
+        end
+      else
+        @compute.tags.create(:resource_id => snapshot.id, :key =>'comments', value => comments)
+      end
     end
     log "Waiting for snapshots to complete."
     sn.each do |s|
@@ -112,7 +116,6 @@ class EC2VolumeSnapshotter
 
   # List snapshots for a set of device and a given kind
   def list_snapshots(devices, kind)
-    volume_map = []
     snapshots = {}
 
     tags = @compute.tags.all(:key => 'instance_id', :value => @instance_id)
