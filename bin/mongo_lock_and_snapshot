@@ -2,7 +2,6 @@
 # Lock a set of disk via the mongo lock command and snapshot them to the cloud
 
 require 'rubygems'
-require 'bundler/setup'
 require 'trollop'
 
 $: << File.join("..", File.dirname(__FILE__), "lib")
@@ -29,7 +28,16 @@ aki = opts[:access_key_id]
 sak = opts[:secret_access_key]
 path = opts[:path]
 
-`/usr/sbin/xfs_freeze -f #{path}`
+def log s
+  $stderr.puts "[#{Time.now}]: #{s}"
+end
+
+db = MongoHelper::DataLocker.new
+db.lock
+if db.locked?
+  log "MongoDB oplog time is #{db.getOplogTime}"
+  `/usr/sbin/xfs_freeze -f #{path}`
+end
 
 begin
   snapshotter = EC2VolumeSnapshotter.new(aki, sak)
@@ -39,11 +47,12 @@ begin
     opts[:limit]
   end
 
-  snapshotter.snapshot_devices(opts[:devices].split(/,/), "Mongo Snapshot", opts[:type], limit)
+  snapshotter.snapshot_devices(opts[:devices].split(/,/), "Mongo Snapshot", opts[:type], limit, "oplogtime = #{db.getOplogTime}")
 rescue Exception => e
   require "pp"
   puts e.inspect  
   pp e.backtrace
 ensure
+  db.unlock
   `/usr/sbin/xfs_freeze -u #{path}`
 end

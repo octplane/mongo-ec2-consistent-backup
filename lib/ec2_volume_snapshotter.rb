@@ -57,7 +57,8 @@ class EC2VolumeSnapshotter
   # Snapshots the list of devices 
   # devices is an array of device attached to the instance (/dev/foo)
   # name if the name of the snapshot
-  def snapshot_devices(devices, name = "#{@instance_id}", kind = "test", limit = KINDS[kind])
+  def snapshot_devices(devices, name = "#{@instance_id}", kind = "test", limit = KINDS[kind], comment=nil)
+
     log "Snapshot of kind #{kind}, limit set to #{limit} (0 means never purge)"
     ts = DateTime.now.to_s
     name = "#{NAME_PREFIX}:" + name
@@ -79,6 +80,8 @@ class EC2VolumeSnapshotter
       @compute.tags.create(:resource_id => snapshot.id, :key =>"instance_id", :value =>@instance_id)
       @compute.tags.create(:resource_id => snapshot.id, :key =>"date", :value => ts)
       @compute.tags.create(:resource_id => snapshot.id, :key =>"kind", :value => kind)
+      @compute.tags.create(:resource_id => snapshot.id, :key =>"comment", :value => comment.to_s)
+
 
     end
     log "Waiting for snapshots to complete."
@@ -97,7 +100,6 @@ class EC2VolumeSnapshotter
         dates = snapshots.keys.sort
         puts dates.inspect
         extra_snapshots = dates[0..-limit]
-        remaining_snapshots = dates[-limit..-1]
         extra_snapshots.each do |date|
           snapshots[date].each do |snap|
             log "Destroying #{snap.description} #{snap.id}"
@@ -157,7 +159,7 @@ if __FILE__ == $0
     opt :find_volume_for, "Show information for device path (mount point)", :type => :string
     opt :snapshot, "Snapshot device path (mount point)", :type => :string
     opt :snapshot_type, "Kind of snapshot (any of #{EC2VolumeSnapshotter::KINDS.keys.join(", ")})", :default => 'test'
-
+    opt :comment, "Comment to add to tags", :type => :string
   end
 
   evs = EC2VolumeSnapshotter.new(opts[:access_key_id], opts[:secret_access_key], opts[:instance_id])

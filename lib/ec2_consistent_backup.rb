@@ -102,11 +102,8 @@ module MongoHelper
 
     def initialize(port = 27017, host = 'localhost')
       @m = Mongo::Connection.new(host, port)
-      args =  @m['admin'].command({'getCmdLineOpts' => 1 })['argv']
-      p = args.index('--dbpath')
-      @path = args[p+1]
+      @path = @m['admin'].command({'getCmdLineOpts' => 1})['parsed']['storage']['dbPath']
       @path = File.readlink(@path) if File.symlink?(@path)
-
     end
 
     def lock
@@ -130,6 +127,18 @@ module MongoHelper
         sleep(1)
       end
     end
+
+    def getOplogTime
+      begin
+        res = @m['admin'].command({'replSetGetStatus' => 1 })
+        hostname = `hostname -f`.strip
+        me = res['members'].select { |m| m['name'] =~ /#{hostname}/ }.first
+        "#{me['optime'].seconds}.#{me['optime'].increment}"
+      rescue
+        return nil
+      end
+    end
+
   end
 end
 
@@ -146,9 +155,8 @@ if __FILE__ == $0
   # First connect to mongo and find the dbpath
   port = opts[:port]
   m = MongoHelper::DataLocker.new(port)
-  data_location = m.path
-  log "Mongo at #{port} has its data in #{data_location}."
-  
+  log "Mongo at #{port} has its data in #{m.path}."
+  log "Mongo has its oplog time at #{m.oplogtime}."
 
   mount_inspector = MountInspector.new
   raid_set = mount_inspector.which_device(data_location)
