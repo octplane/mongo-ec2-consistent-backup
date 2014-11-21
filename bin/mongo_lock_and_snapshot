@@ -36,6 +36,7 @@ db = MongoHelper::DataLocker.new
 db.lock
 if db.locked?
   log "MongoDB oplog time is #{db.getOplogTime}"
+  `sync ; sleep 5 ; sync ; sleep 5 ; sync`
   `/usr/sbin/xfs_freeze -f #{path}`
 end
 

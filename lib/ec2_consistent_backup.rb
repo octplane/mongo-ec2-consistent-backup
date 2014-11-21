@@ -102,8 +102,14 @@ module MongoHelper
 
     def initialize(port = 27017, host = 'localhost')
       @m = Mongo::Connection.new(host, port)
-      @path = @m['admin'].command({'getCmdLineOpts' => 1})['parsed']['storage']['dbPath']
+      @path = getDbPath
       @path = File.readlink(@path) if File.symlink?(@path)
+    end
+
+    def getDbPath
+      opts = @m['admin'].command({'getCmdLineOpts' => 1})
+      path = opts['parsed'].fetch('storage', {}).fetch('dbPath', nil)
+      path.nil? ? opts['parsed']['dbpath'] : path
     end
 
     def lock
@@ -116,11 +122,11 @@ module MongoHelper
     end
 
     def locked?
-      @m.locked?
+      @m.locked? or is_tokuMX?
     end
 
     def unlock
-      return if !locked?
+      return if !locked? or is_tokuMX?
       raise "Already unlocked" if !locked?
       @m.unlock!
       while locked? do
@@ -128,12 +134,20 @@ module MongoHelper
       end
     end
 
+    def is_tokuMX?
+      @m['admin'].command({'buildInfo' => 1}).has_key?('tokumxVersion')
+    end
+
     def getOplogTime
       begin
         res = @m['admin'].command({'replSetGetStatus' => 1 })
         hostname = `hostname -f`.strip
         me = res['members'].select { |m| m['name'] =~ /#{hostname}/ }.first
-        "#{me['optime'].seconds}.#{me['optime'].increment}"
+        if is_tokuMX?
+          me['lastGTID']
+        else
+         "#{me['optime'].seconds}.#{me['optime'].increment}"
+        end
       rescue
         return nil
       end
