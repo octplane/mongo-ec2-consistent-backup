@@ -40,8 +40,9 @@ class EC2VolumeSnapshotter
   # Kind of snapshot and their expiration in days
   KINDS = { 'test' => 1,
     'snapshot' => 0,
-    'daily' => 7,
-    'weekly' => 31,
+    'hourly' => 4,
+    'daily' => 3,
+    'weekly' => 1,
     'monthly' => 300,
     'yearly' => 0}
 
