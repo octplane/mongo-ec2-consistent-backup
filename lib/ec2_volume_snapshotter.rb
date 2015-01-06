@@ -62,6 +62,8 @@ class EC2VolumeSnapshotter
 
     log "Snapshot of kind #{kind}, limit set to #{limit} (0 means never purge)"
     ts = DateTime.now.to_s
+    t = Time.new
+    backup_id = sprintf("%4d%02d%02d.%02d", t.year, t.month, t.day, t.hour)
     name = "#{NAME_PREFIX}:" + name
     volumes = {}
     devices.each do |device|
@@ -81,6 +83,7 @@ class EC2VolumeSnapshotter
       @compute.tags.create(:resource_id => snapshot.id, :key =>"instance_id", :value =>@instance_id)
       @compute.tags.create(:resource_id => snapshot.id, :key =>"date", :value => ts)
       @compute.tags.create(:resource_id => snapshot.id, :key =>"kind", :value => kind)
+      @compute.tags.create(:resource_id => snapshot.id, :key =>"backup_id", :value => backup_id)
       if comments.is_a? Hash
         comments.each do |k, v = nil|
           @compute.tags.create(:resource_id => snapshot.id, :key => k, :value => v)
