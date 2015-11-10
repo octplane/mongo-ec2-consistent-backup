@@ -28,6 +28,8 @@ aki = opts[:access_key_id]
 sak = opts[:secret_access_key]
 path = opts[:path]
 
+raise "Path cannot be /" if path == '/'
+
 def log s
   $stderr.puts "[#{Time.now}]: #{s}"
 end
@@ -37,7 +39,7 @@ db.lock
 if db.locked?
   log "MongoDB oplog time is #{db.getOplogTime}"
   `sync ; sleep 5 ; sync ; sleep 5 ; sync`
-  `/usr/sbin/xfs_freeze -f #{path}`
+  `if xfs_info #{path} > /dev/null 2>&1 ; then /usr/sbin/xfs_freeze -f #{path} ; else /sbin/fsfreeze -f #{path} ; fi`
 end
 
 begin
@@ -55,5 +57,5 @@ rescue Exception => e
   pp e.backtrace
 ensure
   db.unlock
-  `/usr/sbin/xfs_freeze -u #{path}`
+  `if xfs_info #{path} > /dev/null 2>&1 ; then /usr/sbin/xfs_freeze -u #{path} ; else /sbin/fsfreeze -u #{path} ; fi`
 end
