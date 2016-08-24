@@ -40,8 +40,9 @@ class EC2VolumeSnapshotter
   # Kind of snapshot and their expiration in days
   KINDS = { 'test' => 1,
     'snapshot' => 0,
-    'daily' => 7,
-    'weekly' => 31,
+    'hourly' => 4,
+    'daily' => 3,
+    'weekly' => 1,
     'monthly' => 300,
     'yearly' => 0}
 
@@ -57,7 +58,7 @@ class EC2VolumeSnapshotter
   # Snapshots the list of devices 
   # devices is an array of device attached to the instance (/dev/foo)
   # name if the name of the snapshot
-  def snapshot_devices(devices, name = "#{@instance_id}", kind = "test", limit = KINDS[kind], comments = {})
+  def snapshot_devices(devices, name = "#{@instance_id}", kind = "test", limit = KINDS[kind], comments = {}, addusers = [])
 
     log "Snapshot of kind #{kind}, limit set to #{limit} (0 means never purge)"
     ts = DateTime.now.to_s
@@ -97,6 +98,9 @@ class EC2VolumeSnapshotter
         sleep(3)
         s.reload
       end while s.state == 'nil' || s.state == 'pending'
+      unless addusers.empty?
+        @compute.modify_snapshot_attribute(s.id, { 'Add.UserId' => addusers })
+      end
     end
 
     if limit != 0
@@ -166,6 +170,7 @@ if __FILE__ == $0
     opt :snapshot, "Snapshot device path (mount point)", :type => :string
     opt :snapshot_type, "Kind of snapshot (any of #{EC2VolumeSnapshotter::KINDS.keys.join(", ")})", :default => 'test'
     opt :comment, "Comment to add to tags", :type => :string
+    opt :addusers, "Share with account ID", :type => :string
   end
 
   evs = EC2VolumeSnapshotter.new(opts[:access_key_id], opts[:secret_access_key], opts[:instance_id])

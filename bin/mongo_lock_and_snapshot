@@ -15,6 +15,7 @@ opts = Trollop::options do
   opt :devices, "Devices to snapshot, comma separated", :type => :string, :required => true
   opt :type, "Snapshot type, to choose among #{EC2VolumeSnapshotter::KINDS.keys.join(",")}", :default => "snapshot"
   opt :limit, "Cleanup old snapshots to keep only limit snapshots", :type => :integer
+  opt :addusers, "Additional user permissions to assign to snapshots", :type => :string, :default => ""
 end
 
 # find instance id by
@@ -28,6 +29,8 @@ aki = opts[:access_key_id]
 sak = opts[:secret_access_key]
 path = opts[:path]
 
+raise "Path cannot be /" if path == '/'
+
 def log s
   $stderr.puts "[#{Time.now}]: #{s}"
 end
@@ -36,7 +39,8 @@ db = MongoHelper::DataLocker.new
 db.lock
 if db.locked?
   log "MongoDB oplog time is #{db.getOplogTime}"
-  `/usr/sbin/xfs_freeze -f #{path}`
+  `sync ; sleep 5 ; sync ; sleep 5 ; sync`
+  `if xfs_info #{path} > /dev/null 2>&1 ; then /usr/sbin/xfs_freeze -f #{path} ; else /sbin/fsfreeze -f #{path} ; fi`
 end
 
 begin
@@ -47,12 +51,12 @@ begin
     opts[:limit]
   end
 
-  snapshotter.snapshot_devices(opts[:devices].split(/,/), "Mongo Snapshot", opts[:type], limit, {"mongo_oplogtime" => db.getOplogTime})
+  snapshotter.snapshot_devices(opts[:devices].split(/,/), "Mongo Snapshot", opts[:type], limit, {"mongo_oplogtime" => db.getOplogTime}, opts[:addusers].split(','))
 rescue Exception => e
   require "pp"
   puts e.inspect  
   pp e.backtrace
 ensure
   db.unlock
-  `/usr/sbin/xfs_freeze -u #{path}`
+  `if xfs_info #{path} > /dev/null 2>&1 ; then /usr/sbin/xfs_freeze -u #{path} ; else /sbin/fsfreeze -u #{path} ; fi`
 end

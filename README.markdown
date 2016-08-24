@@ -52,6 +52,7 @@ If you use IAM for your authentication in EC2, here is a probably up to date lis
   "ec2:CreateSnapshot",
   "ec2:DeleteSnapshot",
   "ec2:DescribeSnapshots",
+  "ec2:ModifySnapshotAttribute",
   "ec2:CreateTags",
   "ec2:DescribeTags",
   "ec2:DescribeVolumes",
