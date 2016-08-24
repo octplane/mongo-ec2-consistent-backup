@@ -25,6 +25,7 @@ GEM
       net-ssh (>= 1.99.1)
     net-ssh (2.5.2)
     nokogiri (1.5.5)
+    rake (11.2.2)
     ruby-hmac (0.4.0)
     trollop (1.16.2)
 
@@ -36,4 +37,8 @@ DEPENDENCIES
   fog
   json
   mongo (~> 1.0)
+  rake
   trollop
+
+BUNDLED WITH
+   1.12.5

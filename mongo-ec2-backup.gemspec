@@ -1,14 +1,6 @@
-require 'rake'
-require "rake/clean"
-require 'rubygems/package_task'
-require 'rdoc/task'
-
-desc "Packages up the gem."
-task :default => :package
-
 spec = Gem::Specification.new do |s|
   s.name    = 'mongo-ec2-backup'
-  s.version = '0.0.9'
+  s.version = '0.1.0'
   s.summary = 'Snapshot your mongodb in the EC2 cloud via XFS Freeze'
 
   s.author   = 'Pierre Baillet'
@@ -23,17 +15,11 @@ spec = Gem::Specification.new do |s|
   s.add_dependency 'json'
 
   # Include everything in the lib folder
-  s.files = FileList['lib/**/*.rb', 'bin/*', '[A-Z]*', 'test/**/*'].to_a
+  s.files = Dir.glob('lib/**/*.rb') + Dir.glob('bin/*') + Dir.glob('[A-Z]*') + Dir.glob('test/**/*')
 
   s.executables << "mongo_lock_and_snapshot"
   s.executables << "ec2_snapshot_restorer"
 
   # Supress the warning about no rubyforge project
   s.rubyforge_project = 'nowarning'
-end
-
-Gem::PackageTask.new(spec) do |package|
-  package.gem_spec = spec
-  # package.need_tar = true 
-  # package.need_zip = true
 end
