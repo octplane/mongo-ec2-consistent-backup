@@ -3,11 +3,10 @@
 require 'rubygems'
 require 'trollop'
 require 'fog'
-require 'open-uri'
-require 'trollop'
 require 'pp'
-$: << File.join(File.dirname(__FILE__), "../lib")
+require 'open-uri'
 require 'ec2_instance_identifier'
+require 'ec2_helper'
 
 
 DEBUG=false
@@ -15,17 +14,19 @@ DEBUG=false
 def log what
   puts what if DEBUG
 end
-# 
+
 class SnapshotRestorer
   attr_accessor :snaps
+
   def initialize(aki, sak)
-    @compute = Fog::Compute.new({:provider => 'AWS', :aws_access_key_id => aki, :aws_secret_access_key => sak})
+    @ec2 = EC2Helper.new(aki, sak)
+    @compute = Fog::Compute.new(@ec2.connection)
     @snaps = []
     @volumes = []
   end
+
   def find_snapshots(instance_id, kind = 'snapshot')
     log "Looking for snapshots for #{instance_id}"
-    volume_map = []
     snapshots = {}
 
     tags = @compute.tags.all(:key => 'instance_id', :value => instance_id)
@@ -48,8 +49,9 @@ class SnapshotRestorer
     snapshots['LATEST'] = snapshots[max_date] if snapshots[max_date]
     return snapshots
   end
-  def prepare_volumes(dest_instance)
-    @snaps.each do | resource_id |
+
+  def prepare_volumes(dest_instance, piops = nil)
+    @snaps.each do |resource_id|
       snap = @compute.snapshots.get(resource_id)
       # Snap have the following tags
       # application
@@ -59,7 +61,11 @@ class SnapshotRestorer
       # kind
 
       t =  snap.tags
-      volume = @compute.volumes.new :snapshot_id => snap.id, :size => snap.volume_size, :availability_zone => 'us-east-1c'
+      if piops
+        volume = @compute.volumes.new :snapshot_id => snap.id, :size => snap.volume_size, :availability_zone => @ec2.availability_zone, :type => 'io1', :iops => piops
+      else
+        volume = @compute.volumes.new :snapshot_id => snap.id, :size => snap.volume_size, :availability_zone => @ec2.availability_zone
+      end
       volume.save
       volume.reload
       @compute.create_tags(volume.id, { "application" => t['application'],
@@ -72,6 +78,7 @@ class SnapshotRestorer
       @volumes << volume
     end
   end
+
   def rattach_volumes(base_device = nil)
     dest = base_device
     if !dest
@@ -86,6 +93,7 @@ class SnapshotRestorer
       dest.next!
     end
   end
+
   def find_volume_for_instance_and_snapshots(dest_instance)
     vols = []
     @snaps.each do | resource_id |
@@ -98,6 +106,7 @@ class SnapshotRestorer
     end
     return vols
   end
+
   def detach_snapshots(dest_instance)
     vols = find_volume_for_instance_and_snapshots(dest_instance)
     if vols.length == 0
@@ -117,26 +126,30 @@ class SnapshotRestorer
       v.destroy()
     end
   end
+
+  def get_instance_id_from_metadata
+    open('http://169.254.169.254/latest/meta-data/instance-id').readline
+  end
 end
 
 
 opts = Trollop::options do
-  opt :hostname, "Hostname tag to use to find the instance", :type => :string, :required => true
-  opt :access_key_id, "Access Key Id for AWS", :type => :string, :required => true
-  opt :secret_access_key, "Secret Access Key for AWS", :type => :string, :required => true
+  opt :hostname, "Hostname tag to use to find the instance", :type => :string
+  opt :access_key_id, "Access Key Id for AWS", :type => :string
+  opt :secret_access_key, "Secret Access Key for AWS", :type => :string
   opt :date, "Date to restore, use LATEST to take latest data", :type => :string
   opt :type, "Snapshot type to restore, defaults to snapshot", :type => :string, :default => 'snapshot'
   opt :target, "Creates volume ready for mounting on instance id. Use special value SELF to restore here", :type => :string
   opt :first_device, "First device to attach to (default is to use source first device) /dev/sdx", :type => :string
+  opt :provisioned_iops, "Creates provisioned IOPS volumes from snapshots.  Supply an IOPS value.", :type => :integer
   opt :action, 'Action', :default => 'attach'
 end
   
-finder = EC2InstanceIdentifier.new(opts[:access_key_id], opts[:secret_access_key])
-instance_identifier = finder.get_instance(opts[:hostname]).id
+instance_identifier = EC2InstanceIdentifier.new(opts[:access_key_id], opts[:secret_access_key])
 s = SnapshotRestorer.new(opts[:access_key_id], opts[:secret_access_key])
 
 # Find this instance snapshots
-snaps = s.find_snapshots(instance_identifier, opts[:type])
+snaps = s.find_snapshots(instance_identifier.get_instance(opts[:hostname]), opts[:type])
 
 if ! opts[:date] || !snaps.has_key?(opts[:date])
   puts "We have found the following snapshot's dates:"
@@ -151,13 +164,13 @@ else
   if opts[:target]
     s.snaps = snaps[opts[:date]].map{ |s| s.id }
     target = opts[:target]
-    target = open("http://169.254.169.254/latest/meta-data/instance-id").read if target == "SELF"
+    target = s.get_instance_id_from_metadata if target == "SELF"
     if opts[:action] == 'attach'
       if !opts[:first_device]
         raise "First device has to be indicated"
       end
       puts "Preparing volumes for instance #{target}"
-      s.prepare_volumes(target)
+      s.prepare_volumes(target, opts[:provisioned_iops])
       # Need to clone, because trollop freeze the variable
 
       s.rattach_volumes(opts[:first_device])
